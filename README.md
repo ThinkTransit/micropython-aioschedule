@@ -14,21 +14,22 @@ Python job scheduling for humans. Run Python functions (or any other callable) p
 - Persistence, tasks survive reboot/restart
 - Tested on MicroPython 1.19
 
+
 Usage
 -----
 
 Requires datetime and functools from micropython-lib
 
 ```
-Copy schedule.py to your micropython lib directory
+Copy schedule.py and datetime.py to your micropython lib directory
 ```
 
 ```python
 
 import schedule
-import time
 import machine
 import uasyncio as asyncio
+from sys import print_exception
 
 async def job():
     print("I'm working...")
@@ -59,7 +60,7 @@ async def main_loop():
     
     # Go to sleep until the next task is due
     idle_secs = schedule.idle_seconds()
-    logger.debug(f'Going to sleep for { idle_secs } seconds')
+    print(f'Going to sleep for { idle_secs } seconds')
     machine.deepsleep(int(idle_secs) * 1000)
     
 # Load schedule from flash
@@ -83,11 +84,6 @@ schedule.save_flash()
 # Load schedule from flash
 schedule.load_flash()
 ```
-
-Documentation
--------------
-
-TODO
 
 
 Meta

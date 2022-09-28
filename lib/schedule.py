@@ -50,7 +50,6 @@ class CancelJob(object):
     """
     Can be returned from a job to unschedule itself.
     """
-
     pass
 
 
@@ -108,33 +107,11 @@ class Scheduler(object):
             self._run_job(job)
             time.sleep(delay_seconds)
 
-    def get_jobs(self, tag = None):
+    def get_jobs(self):
         """
-        Gets scheduled jobs marked with the given tag, or all jobs
-        if tag is omitted.
-
-        :param tag: An identifier used to identify a subset of
-                    jobs to retrieve
+        Gets scheduled jobs
         """
-        if tag is None:
-            return self.jobs[:]
-        else:
-            return [job for job in self.jobs if tag in job.tags]
-
-    def clear(self, tag = None) -> None:
-        """
-        Deletes scheduled jobs marked with the given tag, or all jobs
-        if tag is omitted.
-
-        :param tag: An identifier used to identify a subset of
-                    jobs to delete
-        """
-        if tag is None:
-            log.debug("Deleting *all* jobs")
-            del self.jobs[:]
-        else:
-            log.debug('Deleting all jobs tagged "%s"', tag)
-            self.jobs[:] = (job for job in self.jobs if tag not in job.tags)
+        return self.jobs[:]
 
     def cancel_job(self, job: "Job") -> None:
         """
@@ -163,20 +140,16 @@ class Scheduler(object):
         if isinstance(ret, CancelJob) or ret is CancelJob:
             self.cancel_job(job)
 
-    def get_next_run(
-        self, tag = None
-    ):
+    def get_next_run(self):
         """
         Datetime when the next job should run.
-
-        :param tag: Filter the next run for the given tag parameter
 
         :return: A :class:`~datetime.datetime` object
                  or None if no jobs scheduled
         """
         if not self.jobs:
             return None
-        jobs_filtered = self.get_jobs(tag)
+        jobs_filtered = self.get_jobs()
         if not jobs_filtered:
             return None
         return min(jobs_filtered).next_run
@@ -251,7 +224,6 @@ class Job(object):
         # optional time of final run
         self.cancel_after = None
 
-        self.tags = set()  # unique set of tags for the job
         self.scheduler = scheduler  # scheduler to register with
 
     def __lt__(self, other) -> bool:
@@ -393,21 +365,7 @@ class Job(object):
         self.start_day = "sunday"
         return self.weeks
 
-    def tag(self, *tags):
-        """
-        Tags the job with one or more unique identifiers.
-
-        Tags must be hashable. Duplicate tags are discarded.
-
-        :param tags: A unique list of ``Hashable`` tags.
-        :return: The invoked job instance
-        """
-        # if not all(isinstance(tag, Hashable) for tag in tags):
-        #     raise TypeError("Tags must be hashable")
-        self.tags.update(tags)
-        return self
-
-    def at(self, time_str: str, tz: str = None):
+    def at(self, time_str: str):
 
         """
         Specify a particular time that the job should be run at.
@@ -425,8 +383,6 @@ class Job(object):
             selected time-unit (e.g. `every().hour.at(':30')` vs.
             `every().minute.at(':30')`).
 
-        :param tz: The timezone that this timestamp refers to. Can be
-            a string that can be parsed by pytz.timezone(), or a pytz.BaseTzInfo object
 
         :return: The invoked job instance
         """
@@ -434,18 +390,6 @@ class Job(object):
             raise ScheduleValueError(
                 "Invalid unit (valid units are `days`, `hours`, and `minutes`)"
             )
-
-        if tz is not None:
-            import pytz
-
-            if isinstance(tz, str):
-                self.at_time_zone = pytz.timezone(tz)  # type: ignore
-            elif isinstance(tz, pytz.BaseTzInfo):
-                self.at_time_zone = tz
-            else:
-                raise ScheduleValueError(
-                    "Timezone must be string or pytz.timezone object"
-                )
 
         if not isinstance(time_str, str):
             raise TypeError("at() should be passed a string")
@@ -596,7 +540,6 @@ class Job(object):
         self.kwargs = kwargs
         self.job_func_name = job_func.__name__
 
-        #functools.update_wrapper(self.job_func, job_func)
         self._schedule_next_run()
         if self.scheduler is None:
             raise ScheduleError(
@@ -632,7 +575,6 @@ class Job(object):
             return CancelJob
 
         log.debug("Running job %s", self)
-        #task = asyncio.run(self.job_func())
         self.job_func = functools.partial(eval(self.job_func_name), *self.args, **self.kwargs)
         task = asyncio.create_task(self.job_func())
         self.scheduler.tasks.append(task)
@@ -700,14 +642,6 @@ class Job(object):
                 kwargs["minute"] = self.at_time.minute
             self.next_run = self.next_run.replace(**kwargs)  # type: ignore
 
-            if self.at_time_zone is not None:
-                # Convert next_run from the expected timezone into the local time
-                # self.next_run is a naive datetime so after conversion remove tzinfo
-                self.next_run = (
-                    self.at_time_zone.localize(self.next_run)
-                    .astimezone()
-                    .replace(tzinfo=None)
-                )
 
             # Make sure we run at the specified time *today* (or *this hour*)
             # as well. This accounts for when a job takes so long it finished
@@ -802,18 +736,11 @@ def run_all(delay_seconds: int = 0) -> None:
     default_scheduler.run_all(delay_seconds=delay_seconds)
 
 
-def get_jobs(tag = None):
+def get_jobs():
     """Calls :meth:`get_jobs <Scheduler.get_jobs>` on the
     :data:`default scheduler instance <default_scheduler>`.
     """
-    return default_scheduler.get_jobs(tag)
-
-
-def clear(tag = None) -> None:
-    """Calls :meth:`clear <Scheduler.clear>` on the
-    :data:`default scheduler instance <default_scheduler>`.
-    """
-    default_scheduler.clear(tag)
+    return default_scheduler.get_jobs()
 
 
 def cancel_job(job: Job) -> None:
@@ -823,11 +750,11 @@ def cancel_job(job: Job) -> None:
     default_scheduler.cancel_job(job)
 
 
-def next_run(tag = None):
+def next_run():
     """Calls :meth:`next_run <Scheduler.next_run>` on the
     :data:`default scheduler instance <default_scheduler>`.
     """
-    return default_scheduler.get_next_run(tag)
+    return default_scheduler.get_next_run()
 
 
 def idle_seconds():
