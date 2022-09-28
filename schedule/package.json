@@ -1,0 +1,9 @@
+{
+  "urls": [
+    ["schedule/schedule.py", "github:ThinkTransit/micropython-aioschedule/schedule/schedule.py"]
+  ],
+  "deps": [
+    ["functools", "datetime"]
+  ],
+  "version": "0.1"
+}

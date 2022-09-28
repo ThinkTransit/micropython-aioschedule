@@ -111,7 +111,19 @@ class Scheduler(object):
         """
         Gets scheduled jobs
         """
-        return self.jobs[:]
+        return [job for job in self.jobs if tag in job.tags]
+
+    def clear(self) -> None:
+        """
+        Deletes scheduled jobs marked with the given tag, or all jobs
+        if tag is omitted.
+
+        :param tag: An identifier used to identify a subset of
+                    jobs to delete
+        """
+
+        log.debug("Deleting *all* jobs")
+        del self.jobs[:]
 
     def cancel_job(self, job: "Job") -> None:
         """
@@ -741,6 +753,13 @@ def get_jobs():
     :data:`default scheduler instance <default_scheduler>`.
     """
     return default_scheduler.get_jobs()
+
+
+def clear() -> None:
+    """Calls :meth:`clear <Scheduler.clear>` on the
+    :data:`default scheduler instance <default_scheduler>`.
+    """
+    default_scheduler.clear()
 
 
 def cancel_job(job: Job) -> None:
