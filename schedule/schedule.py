@@ -78,14 +78,11 @@ class Scheduler(object):
         for job in sorted(runnable_jobs):
             self._run_job(job)
 
-        log.debug(f"Jobs to await: {len(self.tasks)}")
+        self.tasks = [task for task in self.tasks if not task.done()]
 
-        tasks = [task for task in self.tasks if not task.done()]
-
-        if tasks:
-            await asyncio.gather(*tasks)
-
-        log.debug("All jobs complete")
+        if self.tasks:
+            log.debug(f"Jobs to await: {len(self.tasks)}")
+            await asyncio.gather(*self.tasks)
 
 
     def run_all(self, delay_seconds: int = 0) -> None:
@@ -111,7 +108,7 @@ class Scheduler(object):
         """
         Gets scheduled jobs
         """
-        return [job for job in self.jobs if tag in job.tags]
+        return self.jobs
 
     def clear(self) -> None:
         """
