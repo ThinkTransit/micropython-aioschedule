@@ -3,8 +3,8 @@
     ["schedule/schedule.py", "github:ThinkTransit/micropython-aioschedule/schedule/schedule.py"]
   ],
   "deps": [
-    ["functools"],
-    ["datetime"]
+    ["functools", "latest"],
+    ["datetime", "latest"]
   ],
   "version": "0.1"
 }
