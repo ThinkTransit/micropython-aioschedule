@@ -64,6 +64,11 @@ class Scheduler(object):
         self.jobs = []
         self.tasks = []
 
+    async def run_forever(self, interval=1):
+        while True:
+            await self.run_pending()
+            await asyncio.sleep(interval)
+
     async def run_pending(self) -> None:
         """
         Run all jobs that are scheduled to run.
