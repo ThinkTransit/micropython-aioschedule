@@ -28,6 +28,22 @@ Requirements
 
 Requires datetime and functools from micropython-lib
 
+Automatic installation, requires MicroPython from github (later than 30-09-2022)
+```python
+>>> import mip
+>>> mip.install("github:ThinkTransit/micropython-aioschedule")
+
+Installing github:ThinkTransit/micropython-aioschedule/package.json to /lib
+Copying: /lib/schedule/schedule.py
+Installing functools (latest) from https://micropython.org/pi/v2 to /lib
+Copying: /lib/functools.mpy
+Installing datetime (latest) from https://micropython.org/pi/v2 to /lib
+Copying: /lib/datetime.mpy
+Done
+>>> 
+ 
+```
+Manual installation
 ```
 Copy schedule.py to your micropython lib directory
 Copy functools.py and datetime.py to your lib directory from micropython-lib
