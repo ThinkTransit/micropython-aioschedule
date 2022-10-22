@@ -11,6 +11,7 @@ import re
 import time
 import json
 import uasyncio as asyncio
+from datetime import timezone
 
 try:
     import logging
@@ -175,7 +176,7 @@ class Scheduler(object):
         """
         if not self.next_run:
             return None
-        return (self.next_run - datetime.datetime.now()).total_seconds()
+        return (self.next_run - datetime.datetime.now(tz=timezone.utc)).total_seconds()
 
 
 class Job(object):
@@ -499,10 +500,10 @@ class Job(object):
         if isinstance(until_time, datetime.datetime):
             self.cancel_after = until_time
         elif isinstance(until_time, datetime.timedelta):
-            self.cancel_after = datetime.datetime.now() + until_time
+            self.cancel_after = datetime.datetime.now(tz=timezone.utc) + until_time
         elif isinstance(until_time, datetime.time):
             self.cancel_after = datetime.datetime.combine(
-                datetime.datetime.now(), until_time
+                datetime.datetime.now(tz=timezone.utc), until_time
             )
         elif isinstance(until_time, str):
             cancel_after = self._decode_datetimestr(
@@ -519,7 +520,7 @@ class Job(object):
                 raise ScheduleValueError("Invalid string format for until()")
             if "-" not in until_time:
                 # the until_time is a time-only format. Set the date to today
-                now = datetime.datetime.now()
+                now = datetime.datetime.now(tz=timezone.utc)
                 cancel_after = cancel_after.replace(
                     year=now.year, month=now.month, day=now.day
                 )
@@ -529,7 +530,7 @@ class Job(object):
                 "until() takes a string, datetime.datetime, datetime.timedelta, "
                 "datetime.time parameter"
             )
-        if self.cancel_after < datetime.datetime.now():
+        if self.cancel_after < datetime.datetime.now(tz=timezone.utc):
             raise ScheduleValueError(
                 "Cannot schedule a job to run until a time in the past"
             )
@@ -566,7 +567,7 @@ class Job(object):
         :return: ``True`` if the job should be run now.
         """
         assert self.next_run is not None, "must run _schedule_next_run before"
-        return datetime.datetime.now() >= self.next_run
+        return datetime.datetime.now(tz=timezone.utc) >= self.next_run
 
     def run(self):
         """
@@ -580,7 +581,7 @@ class Job(object):
                  deadline is reached.
 
         """
-        if self._is_overdue(datetime.datetime.now()):
+        if self._is_overdue(datetime.datetime.now(tz=timezone.utc)):
             log.debug("Cancelling job %s", self)
             return CancelJob
 
@@ -589,7 +590,7 @@ class Job(object):
         task = asyncio.create_task(self.job_func())
         self.scheduler.tasks.append(task)
 
-        self.last_run = datetime.datetime.now()
+        self.last_run = datetime.datetime.now(tz=timezone.utc)
         self._schedule_next_run()
 
         if self._is_overdue(self.next_run):
@@ -620,7 +621,7 @@ class Job(object):
         elif self.next_run and not self.last_run:
             pass
         else:
-            self.next_run = datetime.datetime.now() + self.period
+            self.next_run = datetime.datetime.now(tz=timezone.utc) + self.period
         if self.start_day is not None:
             if self.unit != "weeks":
                 raise ScheduleValueError("`unit` should be 'weeks'")
@@ -657,7 +658,7 @@ class Job(object):
             # as well. This accounts for when a job takes so long it finished
             # in the next period.
             if not self.last_run or (self.next_run - self.last_run) > self.period:
-                now = datetime.datetime.now()
+                now = datetime.datetime.now(tz=timezone.utc)
                 if (
                     self.unit == "days"
                     and self.at_time > now.time()
@@ -676,7 +677,7 @@ class Job(object):
                     self.next_run = self.next_run - datetime.timedelta(minutes=1)
         if self.start_day is not None and self.at_time is not None:
             # Let's see if we will still make that time we specified today
-            if (self.next_run - datetime.datetime.now()).days >= 7:
+            if (self.next_run - datetime.datetime.now(tz=timezone.utc)).days >= 7:
                 self.next_run -= self.period
 
     def _is_overdue(self, when: datetime.datetime):
