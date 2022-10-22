@@ -4,6 +4,7 @@
 import machine
 
 import datetime
+from datetime import timezone
 import functools
 import random
 import re
@@ -822,12 +823,12 @@ def from_json(data):
             pass
 
         try:
-            job.last_run = datetime.datetime.fromtimestamp(j['last_run'])
+            job.last_run = datetime.datetime.fromtimestamp(j['last_run'], tz=timezone.utc)
         except:
             pass
 
         try:
-            job.next_run = datetime.datetime.fromtimestamp(j['next_run'])
+            job.next_run = datetime.datetime.fromtimestamp(j['next_run'], tz=timezone.utc)
         except:
             pass
 
