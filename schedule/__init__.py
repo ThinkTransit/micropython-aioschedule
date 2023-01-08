@@ -4,7 +4,6 @@
 import machine
 
 import datetime
-from datetime import timezone
 import functools
 import random
 import re
@@ -65,6 +64,7 @@ class Scheduler(object):
     def __init__(self) -> None:
         self.jobs = []
         self.tasks = []
+        self.tz = timezone.utc
 
     async def run_pending(self) -> None:
         """
@@ -176,7 +176,7 @@ class Scheduler(object):
         """
         if not self.next_run:
             return None
-        return (self.next_run - datetime.datetime.now(tz=timezone.utc)).total_seconds()
+        return (self.next_run - datetime.datetime.now(tz=self.tz)).total_seconds()
 
 
 class Job(object):
