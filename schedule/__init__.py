@@ -25,8 +25,11 @@ except ImportError:
             print('WARNING: ' + entry)
         def info(self, entry):
             print('INFO: ' + entry)
-        def debug(self, entry):
-            print('DEBUG: ' + entry)
+        def debug(self, entry, value=None):
+            if value:
+                print('DEBUG: ' + entry % value)
+            else:
+                print('DEBUG: ' + entry)
     log = logging()
 
 class ScheduleError(Exception):
