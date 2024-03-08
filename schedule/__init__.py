@@ -1,8 +1,6 @@
 # ---------------------------------------------------------------------------
 # schedule.py
 # ---------------------------------------------------------------------------
-import machine
-
 import datetime
 import functools
 import random
@@ -712,10 +710,10 @@ class Job(object):
             data['at_time'] = self.at_time.isoformat()
 
         if self.last_run is not None:
-            data['last_run'] = int(self.last_run.timestamp())
+            data['last_run'] = self.last_run.isoformat()
 
         if self.next_run is not None:
-            data['next_run'] = int(self.next_run.timestamp())
+            data['next_run'] = self.next_run.isoformat()
 
         return data
 
@@ -810,6 +808,26 @@ def to_json():
 
     return json.dumps(data)
 
+# datetime.EPOCH is 2000 on ESP32 vs 1970
+# allow for scheduling and saving on unix port and uploading to ESP32
+# or downloading to test
+def parse_float_or_isotime(str):
+    dt = None
+    if (str is not None):
+        try:
+
+            # parse possible timestamp float value
+            ts = float(str)
+            dt = datetime.datetime.fromtimestamp(ts, tz=timezone.utc)
+        except (TypeError, ValueError):
+
+            # try ISO format
+            try:
+                dt = datetime.datetime.fromisoformat(str)
+            except (ValueError):
+                log.error("invalid date/time: %s", str)
+    return dt
+
 def from_json(data):
     # TODO: Document and add error handling
 
@@ -820,28 +838,30 @@ def from_json(data):
         job.kwargs = j['kwargs']
         job.job_func_name = j['job_func_name']
         job.unit = j['unit']
+        job.start_day = j['start_day']
+        job.cancel_after = j['cancel_after']
 
         try:
             job.at_time = datetime.time.fromisoformat(j['at_time'])
         except:
             pass
 
-        try:
-            job.last_run = datetime.datetime.fromtimestamp(j['last_run'], tz=timezone.utc)
-        except:
-            pass
+        if ('last_run' in j):
+            job.last_run = parse_float_or_isotime(j['last_run'])
 
-        try:
-            job.next_run = datetime.datetime.fromtimestamp(j['next_run'], tz=timezone.utc)
-        except:
-            pass
+        # next_run should have already been set and saved
+        # avoid calling _schedule_next_run again, because if last_run is not set and the system is restarted then the job will wait for another interval
+        if ('next_run' in j):
+            job.next_run = parse_float_or_isotime(j['next_run'])
+        if (job.next_run is None):
+            try:
+                job._schedule_next_run()
+            except Exception as e:
+                log.error("error calculating next_run: %s", repr(e))
 
-        job.start_day = j['start_day']
-        job.cancel_after = j['cancel_after']
-
-        job._schedule_next_run()
-
-        jobs.append(job)
+        if (job.next_run is not None):
+            #log.debug("next_run (scheduled): %s", job.next_run.isoformat())
+            jobs.append(job)
 
     return jobs
 
@@ -866,4 +886,6 @@ def load_flash(keep_existing=False):
     try:
         from_json(json.load(open('schedule.json', "r")))
     except OSError:
-        log.debug("Schedule file not found")
+        log.warning("Schedule file not found")
+    except Exception as e:
+        log.error("Error reading schedule file: %s", repr(e))
