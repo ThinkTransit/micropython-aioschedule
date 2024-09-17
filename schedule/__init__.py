@@ -7,7 +7,7 @@ import random
 import re
 import time
 import json
-import uasyncio as asyncio
+import asyncio
 from datetime import timezone
 
 try:
@@ -132,10 +132,10 @@ class Scheduler(object):
         :param job: The job to be unscheduled
         """
         try:
-            log.debug('Cancelling job "%s"', str(job))
+            log.debug('Cancelling job %s', str(job))
             self.jobs.remove(job)
         except ValueError:
-            log.debug('Cancelling not-scheduled job "%s"', str(job))
+            log.error('Cancelling not-scheduled job %s', str(job))
 
     def every(self, interval: int = 1) -> "Job":
         """
@@ -583,7 +583,7 @@ class Job(object):
 
         """
         if self._is_overdue(datetime.datetime.now(tz=timezone.utc)):
-            log.debug("Cancelling job %s", self)
+            log.debug("Cancelling overdue job %s", self)
             return CancelJob
 
         log.debug("Running job %s", self)
@@ -595,7 +595,7 @@ class Job(object):
         self._schedule_next_run()
 
         if self._is_overdue(self.next_run):
-            log.debug("Cancelling job %s", self)
+            log.debug("Cancelling overdue job post-run %s", self)
             return CancelJob
         return task
 
@@ -680,6 +680,7 @@ class Job(object):
             # Let's see if we will still make that time we specified today
             if (self.next_run - datetime.datetime.now(tz=timezone.utc)).days >= 7:
                 self.next_run -= self.period
+        log.debug("Job %s re-scheduled to run at %s", self, self.next_run)
 
     def _is_overdue(self, when: datetime.datetime):
         return self.cancel_after is not None and when > self.cancel_after
@@ -703,14 +704,16 @@ class Job(object):
                 'kwargs': self.kwargs,
                 'job_func_name': self.job_func_name,
                 'unit': self.unit,
-                'start_day': self.start_day,
-                'cancel_after': self.cancel_after}
+                'start_day': self.start_day}
 
         if self.at_time is not None:
             data['at_time'] = self.at_time.isoformat()
 
         if self.last_run is not None:
             data['last_run'] = self.last_run.isoformat()
+
+        if self.cancel_after is not None:
+            data['cancel_after'] = self.cancel_after.isoformat()
 
         if self.next_run is not None:
             data['next_run'] = self.next_run.isoformat()
@@ -839,7 +842,6 @@ def from_json(data):
         job.job_func_name = j['job_func_name']
         job.unit = j['unit']
         job.start_day = j['start_day']
-        job.cancel_after = j['cancel_after']
 
         try:
             job.at_time = datetime.time.fromisoformat(j['at_time'])
@@ -848,6 +850,8 @@ def from_json(data):
 
         if ('last_run' in j):
             job.last_run = parse_float_or_isotime(j['last_run'])
+        if ('cancel_after' in j):
+            job.cancel_after = parse_float_or_isotime(j['cancel_after'])
 
         # next_run should have already been set and saved
         # avoid calling _schedule_next_run again, because if last_run is not set and the system is restarted then the job will wait for another interval
@@ -860,9 +864,8 @@ def from_json(data):
                 log.error("error calculating next_run: %s", repr(e))
 
         if (job.next_run is not None):
-            #log.debug("next_run (scheduled): %s", job.next_run.isoformat())
+            log.debug("Loaded job %s scheduled to run at %s", str(job), job.next_run)
             jobs.append(job)
-
     return jobs
 
 async def run_forever(interval=1):
@@ -880,7 +883,7 @@ def load_flash(keep_existing=False):
     # TODO: Document
     # Clear existing jobs
     if not keep_existing:
-        for jb in jobs:
+        for jb in list(jobs):  # Iterate over a copy of the list
             default_scheduler.cancel_job(jb)
     # Read jobs from flash
     try:
